@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NLP Feature Extraction — Deep Dive</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:15px;line-height:1.6}
+
+/* HERO */
+.hero{background:#0f1123;color:#fff;padding:2rem 2.5rem 2.2rem;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 80% at 80% 50%,rgba(108,99,255,.18) 0%,transparent 70%);pointer-events:none}
+.badge-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
+.pill{background:#6c63ff;color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 14px;border-radius:999px}
+.pill-sub{color:rgba(255,255,255,.5);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.hero h1{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.4rem}
+.hero p{color:rgba(255,255,255,.6);font-size:.9rem;max-width:580px;line-height:1.6}
+
+/* PAGE */
+.page{max-width:960px;margin:0 auto;padding:1.5rem 1.5rem 3rem}
+.sec-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:.75rem;margin-top:.1rem}
+.card{background:#fff;border:1px solid #e2e4ea;border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.25rem}
+.card h3{font-size:1rem;font-weight:700;margin-bottom:.5rem;color:#1a1a2e}
+.card p,.card li{font-size:.875rem;color:#444;line-height:1.65}
+.card ul,.card ol{padding-left:1.2rem;margin-top:.4rem}
+.card li{margin-bottom:.3rem}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+.divider{border:none;border-top:1px solid #e2e4ea;margin:1.75rem 0}
+
+/* STEP FLOW */
+.step-flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:.75rem}
+.step-box{background:#0f1123;color:#fff;font-size:12px;font-weight:600;padding:8px 14px;border-radius:8px}
+.step-arrow{color:#6c63ff;font-size:1.1rem;font-weight:700}
+
+/* STEP CARDS */
+.step-card{background:#fff;border:1px solid #e2e4ea;border-radius:12px;overflow:hidden;margin-bottom:1.5rem}
+.step-card-header{display:flex;align-items:center;gap:14px;padding:1rem 1.5rem;border-bottom:1px solid #e2e4ea;background:#f7f8fc}
+.step-num-badge{width:32px;height:32px;border-radius:50%;background:#6c63ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-card-header h3{font-size:1rem;font-weight:700;color:#1a1a2e;margin:0}
+.step-card-header .step-sub{font-size:.78rem;color:#888;margin-top:1px}
+.step-body{padding:1.25rem 1.5rem}
+.step-body p,.step-body li{font-size:.875rem;color:#444;line-height:1.65}
+.step-body ul{padding-left:1.2rem;margin-top:.4rem}
+.step-body li{margin-bottom:.3rem}
+
+/* TOKENS / CHIPS */
+.tokens-wrap{display:flex;flex-wrap:wrap;gap:8px;padding:.5rem 0}
+.tok{display:inline-flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.tok-word{padding:6px 10px;border-radius:7px;font-size:13px;font-weight:600;border:1.5px solid transparent;transition:transform .12s}
+.tok:hover .tok-word{transform:translateY(-2px)}
+.tok-tag{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:4px}
+
+.t-purple .tok-word{background:#ede9fe;color:#5b21b6;border-color:#c4b5fd}.t-purple .tok-tag{background:#ede9fe;color:#5b21b6}
+.t-teal  .tok-word{background:#ccfbf1;color:#065f46;border-color:#5eead4}.t-teal  .tok-tag{background:#ccfbf1;color:#065f46}
+.t-amber .tok-word{background:#fef3c7;color:#92400e;border-color:#fcd34d}.t-amber .tok-tag{background:#fef3c7;color:#92400e}
+.t-coral .tok-word{background:#fee2e2;color:#991b1b;border-color:#fca5a5}.t-coral .tok-tag{background:#fee2e2;color:#991b1b}
+.t-blue  .tok-word{background:#dbeafe;color:#1e40af;border-color:#93c5fd}.t-blue  .tok-tag{background:#dbeafe;color:#1e40af}
+.t-green .tok-word{background:#dcfce7;color:#166534;border-color:#86efac}.t-green .tok-tag{background:#dcfce7;color:#166534}
+.t-gray  .tok-word{background:#f4f4f6;color:#6b7280;border-color:#d1d5db}.t-gray  .tok-tag{background:#f4f4f6;color:#6b7280}
+
+/* info box */
+.info-box{background:#f7f8fc;border:1px solid #e2e4ea;border-radius:8px;padding:.7rem 1rem;font-size:.82rem;color:#444;line-height:1.6;margin-top:.75rem;min-height:40px}
+.code-box{background:#0f1123;color:#a5f3fc;border-radius:8px;padding:.9rem 1.1rem;font-size:.8rem;font-family:'Courier New',monospace;line-height:1.7;overflow-x:auto;margin-top:.75rem}
+.code-kw{color:#c084fc}.code-str{color:#86efac}.code-comment{color:#64748b}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:.75rem 0 0}
+.leg{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.leg-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+/* quiz */
+.qcard{background:#fff;border:1px solid #e2e4ea;border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+.qnum{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6c63ff;margin-bottom:.35rem}
+.qtext{font-size:.9rem;font-weight:600;color:#1a1a2e;margin-bottom:.3rem;line-height:1.5}
+.qsentence{font-size:.82rem;color:#555;font-style:italic;margin-bottom:.9rem;padding:.5rem .75rem;background:#f7f8fc;border-radius:6px;border-left:3px solid #6c63ff}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;border:1.5px solid #e2e4ea;background:#fff;cursor:pointer;font-size:.875rem;font-weight:500;color:#1a1a2e;text-align:left;width:100%;font-family:inherit}
+.opt:hover:not([disabled]){background:#f7f8fc;border-color:#bbb}
+.opt-letter{width:22px;height:22px;border-radius:50%;background:#f0f2f5;color:#555;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.opt.correct{background:#dcfce7;border-color:#86efac;color:#166534}
+.opt.correct .opt-letter{background:#86efac;color:#166534}
+.opt.wrong{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.opt.wrong .opt-letter{background:#fca5a5;color:#991b1b}
+.opt.show-correct{background:#dcfce7;border-color:#86efac;color:#166534}
+.opt.show-correct .opt-letter{background:#86efac;color:#166534}
+.qfeedback{margin-top:.75rem;padding:.65rem .9rem;border-radius:8px;font-size:.82rem;line-height:1.55;display:none}
+.qfeedback.ok{display:block;background:#dcfce7;color:#166534;font-weight:600}
+.qfeedback.no{display:block;background:#fee2e2;color:#7f1d1d;font-weight:600}
+.score-box{background:#fff;border:1px solid #e2e4ea;border-radius:12px;padding:1.1rem 1.5rem;display:flex;align-items:center;gap:1.25rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.score-big{font-size:2rem;font-weight:800;color:#6c63ff;min-width:60px}
+.score-info strong{color:#1a1a2e;display:block;margin-bottom:2px}
+.score-info{font-size:.875rem;color:#555;line-height:1.6}
+
+/* ── VISUALIZER SPECIFIC ── */
+.viz-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.viz-bar-label{font-size:12px;font-weight:600;min-width:90px;color:#1a1a2e;font-family:'Courier New',monospace}
+.viz-bar-track{flex:1;height:22px;background:#f0f2f5;border-radius:5px;overflow:hidden;position:relative}
+.viz-bar-fill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.viz-bar-val{font-size:11px;font-weight:700;min-width:38px;text-align:right;font-family:'Courier New',monospace}
+
+/* matrix table */
+.mat-wrap{overflow-x:auto;margin-top:.75rem}
+.mat-table{border-collapse:collapse;font-size:12px;font-family:'Courier New',monospace}
+.mat-table th{background:#0f1123;color:#fff;padding:6px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em}
+.mat-table td{padding:7px 12px;text-align:center;border:1px solid #e2e4ea}
+.mat-table tr:nth-child(odd) td{background:#f7f8fc}
+.mat-table td.hi{background:#ede9fe;color:#5b21b6;font-weight:700}
+.mat-table td.hi2{background:#dbeafe;color:#1e40af;font-weight:700}
+.mat-table td.hi3{background:#fef3c7;color:#92400e;font-weight:700}
+.mat-table td.zero{color:#c9c9c9}
+.mat-table .row-lbl{background:#f7f8fc;font-weight:700;color:#1a1a2e;text-align:left;font-size:11px}
+
+/* ngram chip row */
+.ngram-section{margin-bottom:12px}
+.ngram-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;margin-bottom:6px}
+
+/* embedding plot */
+.emb-canvas-wrap{background:#f7f8fc;border:1px solid #e2e4ea;border-radius:10px;overflow:hidden;position:relative;margin-top:.75rem}
+canvas{display:block}
+
+/* TF-IDF interactive */
+.tfidf-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
+.tfidf-controls select,.tfidf-controls button{padding:7px 14px;border-radius:8px;border:1.5px solid #e2e4ea;background:#fff;font-size:13px;font-family:inherit;cursor:pointer;color:#1a1a2e;font-weight:500}
+.tfidf-controls select:focus,.tfidf-controls button:focus{outline:2px solid #6c63ff;outline-offset:2px}
+.tfidf-controls button{background:#6c63ff;color:#fff;border-color:#6c63ff}
+.tfidf-controls button:hover{background:#5a52e0}
+
+/* cosine sim */
+.sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.sim-doc{padding:.75rem 1rem;border-radius:8px;background:#f7f8fc;border:1px solid #e2e4ea;font-size:13px;line-height:1.6}
+.sim-doc strong{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;display:block;margin-bottom:4px}
+.sim-score-wrap{display:flex;align-items:center;gap:16px;margin-top:12px;padding:1rem;background:#f7f8fc;border-radius:10px;border:1px solid #e2e4ea}
+.sim-score-num{font-size:2.5rem;font-weight:800;min-width:80px;text-align:center}
+.sim-score-bar-track{flex:1;height:18px;background:#e2e4ea;border-radius:99px;overflow:hidden}
+.sim-score-bar-fill{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.sim-label{font-size:11px;color:#888;font-weight:600;text-align:center;margin-top:4px}
+
+/* vocab heatmap */
+.heatmap-grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:.75rem}
+.hm-cell{border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;cursor:pointer;transition:transform .12s;border:1px solid transparent}
+.hm-cell:hover{transform:scale(1.08)}
+
+/* one-hot demo */
+.ohe-scroll{overflow-x:auto}
+.ohe-table{border-collapse:collapse;font-size:11px;font-family:'Courier New',monospace;white-space:nowrap}
+.ohe-table th{background:#0f1123;color:#a5f3fc;padding:5px 10px;font-size:10px;letter-spacing:.04em}
+.ohe-table td{padding:5px 10px;border:1px solid #e2e4ea;text-align:center}
+.ohe-table .word-col{font-weight:700;color:#1a1a2e;text-align:left;background:#f7f8fc;min-width:80px}
+.ohe-table .one{background:#fee2e2;color:#991b1b;font-weight:800}
+.ohe-table .zero{color:#d1d5db}
+
+/* comparison table */
+.comp-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.comp-table th{background:#0f1123;color:#fff;padding:8px 12px;text-align:left;font-size:.75rem;font-weight:700;letter-spacing:.04em}
+.comp-table td{padding:8px 12px;border-bottom:1px solid #e2e4ea;vertical-align:top}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-table tr:nth-child(even) td{background:#f7f8fc}
+.badge-yes{background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.badge-no{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.badge-partial{background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+
+@media(max-width:700px){
+  .two-col,.three-col,.sim-grid{grid-template-columns:1fr}
+  .hero{padding:1.5rem}.hero h1{font-size:1.4rem}
+}
+
+/* radar chart */
+.radar-why{background:#f0f4ff;border:1px solid #c7d2fe;border-radius:10px;padding:.85rem 1.1rem;font-size:.84rem;color:#3730a3;line-height:1.65;margin-bottom:1.1rem}
+.radar-why strong{color:#1e1b4b}
+.radar-canvas-wrap{display:flex;justify-content:center;align-items:flex-start;gap:1.5rem;flex-wrap:wrap;margin-top:.5rem}
+.radar-legend{display:flex;flex-direction:column;gap:8px;min-width:170px;padding:.5rem 0}
+.radar-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#333;cursor:pointer;padding:4px 8px;border-radius:6px;transition:background .15s}
+.radar-leg-item:hover{background:#f0f2f5}
+.radar-leg-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+.radar-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center}
+.radar-controls button{padding:5px 13px;border-radius:7px;border:1.5px solid #e2e4ea;background:#fff;font-size:12px;font-family:inherit;cursor:pointer;color:#555;font-weight:600;transition:background .15s,border-color .15s}
+.radar-controls button.active{background:#6c63ff;color:#fff;border-color:#6c63ff}
+.radar-tooltip{position:fixed;background:#0f1123;color:#fff;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;pointer-events:none;display:none;z-index:999;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge-row">
+    <span class="pill">NLP Series</span>
+    <span class="pill-sub">Feature Extraction</span>
+  </div>
+  <h1>NLP Feature Extraction — Deep Dive</h1>
+  <p>How raw text is transformed into numbers that machine learning models can actually learn from — from simple word counts to dense semantic vectors.</p>
+</div>
+
+<div class="page">
+
+<!-- ══════════════════════════════════════
+     SECTION 1 — WHY FEATURE EXTRACTION
+══════════════════════════════════════ -->
+<div class="sec-title">Why Feature Extraction?</div>
+<div class="card">
+  <h3>The fundamental problem: machines only understand numbers</h3>
+  <p>A model cannot learn from the string <em>"the cat sat on the mat"</em>. It needs numbers. Feature extraction is the translation layer — it encodes words, sentences, or documents into fixed-length numeric vectors that capture meaning, frequency, or structure.</p>
+  <p style="margin-top:.5rem">The choice of representation is one of the most consequential decisions in any NLP system. A poor representation throws away useful signal before the model even begins. A rich one makes even simple classifiers perform well.</p>
+  <!-- PROFESSIONAL FLOWCHART -->
+  <div style="margin-top:1.25rem;overflow-x:auto">
+  <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;font-family:'Segoe UI',system-ui,sans-serif">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 Z" fill="#6c63ff"/>
+      </marker>
+      <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000014"/>
+      </filter>
+    </defs>
+
+    <!-- RAW TEXT node -->
+    <rect x="280" y="10" width="200" height="46" rx="10" fill="#0f1123" filter="url(#sh)"/>
+    <text x="380" y="38" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Raw Text</text>
+
+    <!-- Arrow 1 -->
+    <line x1="380" y1="56" x2="380" y2="78" stroke="#6c63ff" stroke-width="2" marker-end="url(#arr)"/>
+
+    <!-- PREPROCESSING node -->
+    <rect x="255" y="80" width="250" height="52" rx="10" fill="#f0f4ff" stroke="#c7d2fe" stroke-width="1.5" filter="url(#sh)"/>
+    <text x="380" y="101" text-anchor="middle" fill="#3730a3" font-size="13.5" font-weight="700">Preprocessing</text>
+    <text x="380" y="120" text-anchor="middle" fill="#6366f1" font-size="11">Tokenization · Cleaning · Normalisation</text>
+
+    <!-- Arrow 2 -->
+    <line x1="380" y1="132" x2="380" y2="154" stroke="#6c63ff" stroke-width="2" marker-end="url(#arr)"/>
+
+    <!-- CHOOSE METHOD node -->
+    <rect x="230" y="156" width="300" height="46" rx="10" fill="#6c63ff" filter="url(#sh)"/>
+    <text x="380" y="179" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Choose Feature Extraction Method</text>
+    <text x="380" y="194" text-anchor="middle" fill="rgba(255,255,255,.65)" font-size="10.5">Select based on task, data size &amp; semantics needed</text>
+
+    <!-- Branch lines from bottom of Choose node down to method level -->
+    <!-- vertical stem -->
+    <line x1="380" y1="202" x2="380" y2="222" stroke="#6c63ff" stroke-width="2"/>
+    <!-- horizontal bar -->
+    <line x1="65" y1="222" x2="695" y2="222" stroke="#6c63ff" stroke-width="1.5"/>
+    <!-- 5 drops -->
+    <line x1="65"  y1="222" x2="65"  y2="244" stroke="#6c63ff" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="205" y1="222" x2="205" y2="244" stroke="#6c63ff" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="380" y1="222" x2="380" y2="244" stroke="#6c63ff" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="555" y1="222" x2="555" y2="244" stroke="#6c63ff" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="695" y1="222" x2="695" y2="244" stroke="#6c63ff" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- Method cards -->
+    <!-- Bag of Words -->
+    <rect x="10" y="246" width="110" height="52" rx="8" fill="#fff" stroke="#e2e4ea" stroke-width="1.5" filter="url(#sh)"/>
+    <text x="65" y="266" text-anchor="middle" fill="#1a1a2e" font-size="11.5" font-weight="700">Bag of Words</text>
+    <text x="65" y="281" text-anchor="middle" fill="#888" font-size="9.5">Sparse · Counts</text>
+    <text x="65" y="292" text-anchor="middle" fill="#888" font-size="9.5">No order</text>
+
+    <!-- N-grams -->
+    <rect x="150" y="246" width="110" height="52" rx="8" fill="#fff" stroke="#e2e4ea" stroke-width="1.5" filter="url(#sh)"/>
+    <text x="205" y="266" text-anchor="middle" fill="#1a1a2e" font-size="11.5" font-weight="700">N-grams</text>
+    <text x="205" y="281" text-anchor="middle" fill="#888" font-size="9.5">Sparse · Local</text>
+    <text x="205" y="292" text-anchor="middle" fill="#888" font-size="9.5">phrase context</text>
+
+    <!-- TF-IDF -->
+    <rect x="325" y="246" width="110" height="52" rx="8" fill="#fff" stroke="#e2e4ea" stroke-width="1.5" filter="url(#sh)"/>
+    <text x="380" y="266" text-anchor="middle" fill="#1a1a2e" font-size="11.5" font-weight="700">TF-IDF</text>
+    <text x="380" y="281" text-anchor="middle" fill="#888" font-size="9.5">Sparse · Weighted</text>
+    <text x="380" y="292" text-anchor="middle" fill="#888" font-size="9.5">Discriminative</text>
+
+    <!-- One-Hot -->
+    <rect x="500" y="246" width="110" height="52" rx="8" fill="#fff" stroke="#e2e4ea" stroke-width="1.5" filter="url(#sh)"/>
+    <text x="555" y="266" text-anchor="middle" fill="#1a1a2e" font-size="11.5" font-weight="700">One-Hot</text>
+    <text x="555" y="281" text-anchor="middle" fill="#888" font-size="9.5">Binary · Identity</text>
+    <text x="555" y="292" text-anchor="middle" fill="#888" font-size="9.5">No semantics</text>
+
+    <!-- Embeddings -->
+    <rect x="640" y="246" width="110" height="52" rx="8" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5" filter="url(#sh)"/>
+    <text x="695" y="262" text-anchor="middle" fill="#5b21b6" font-size="11.5" font-weight="700">Embeddings</text>
+    <text x="695" y="277" text-anchor="middle" fill="#7c3aed" font-size="9.5">Word2Vec · GloVe</text>
+    <text x="695" y="288" text-anchor="middle" fill="#7c3aed" font-size="9.5">BERT · Dense</text>
+
+    <!-- Merge lines up to horizontal join bar -->
+    <line x1="65"  y1="298" x2="65"  y2="328" stroke="#6c63ff" stroke-width="1.5"/>
+    <line x1="205" y1="298" x2="205" y2="328" stroke="#6c63ff" stroke-width="1.5"/>
+    <line x1="380" y1="298" x2="380" y2="328" stroke="#6c63ff" stroke-width="1.5"/>
+    <line x1="555" y1="298" x2="555" y2="328" stroke="#6c63ff" stroke-width="1.5"/>
+    <line x1="695" y1="298" x2="695" y2="328" stroke="#6c63ff" stroke-width="1.5"/>
+    <line x1="65"  y1="328" x2="695" y2="328" stroke="#6c63ff" stroke-width="1.5"/>
+    <line x1="380" y1="328" x2="380" y2="348" stroke="#6c63ff" stroke-width="2" marker-end="url(#arr)"/>
+
+    <!-- ML Model node -->
+    <rect x="255" y="350" width="250" height="42" rx="10" fill="#0f1123" filter="url(#sh)"/>
+    <text x="380" y="375" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">ML / DL Model</text>
+  </svg>
+  </div>
+</div>
+
+<div class="three-col">
+  <div class="card" style="margin-bottom:0">
+    <!-- WHAT IS CLASSIFICATION label -->
+    <div style="background:#0f1123;border-radius:8px;padding:.6rem .9rem;margin-bottom:.85rem;display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:1.3rem;line-height:1">📊</span>
+      <div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#a5f3fc;margin-bottom:3px">What is Classification?</div>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.75);line-height:1.5">Assigning a label or category to a piece of text — the model reads the text and answers <em style="color:#fff">"which bucket does this belong to?"</em></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.65rem">
+      <span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">📧 Gmail spam filter</span>
+      <span style="background:#dbeafe;color:#1e40af;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">⭐ Amazon review rating</span>
+      <span style="background:#dcfce7;color:#166534;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">📰 News topic tagging</span>
+    </div>
+    <h3>Classification</h3>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:3px 9px;margin:.45rem 0 .6rem;font-size:11px;font-weight:700;color:#92400e;letter-spacing:.03em">
+      <span>⚡</span> Real-world example
+    </div>
+    <p style="font-size:.82rem;color:#555;margin-bottom:.5rem;line-height:1.55">Gmail labels your email as <strong>Spam</strong> or <strong>Not Spam</strong> the moment it arrives — that's a text classifier running on feature vectors built from the email body.</p>
+    <p>Spam detection, sentiment analysis, and topic labelling all start with feature vectors. BoW + logistic regression is still a strong baseline.</p>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <!-- WHAT IS SEARCH & RETRIEVAL label -->
+    <div style="background:#0f1123;border-radius:8px;padding:.6rem .9rem;margin-bottom:.85rem;display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:1.3rem;line-height:1">🔍</span>
+      <div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#a5f3fc;margin-bottom:3px">What is Search & Retrieval?</div>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.75);line-height:1.5">Finding the most relevant documents from a large collection given a query — <em style="color:#fff">"which pages best match what the user is looking for?"</em></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.65rem">
+      <span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">🔎 Google Search</span>
+      <span style="background:#dbeafe;color:#1e40af;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">🎵 Spotify mood search</span>
+      <span style="background:#dcfce7;color:#166534;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">📚 Legal doc discovery</span>
+    </div>
+    <h3>Search & Retrieval</h3>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:3px 9px;margin:.45rem 0 .6rem;font-size:11px;font-weight:700;color:#92400e;letter-spacing:.03em">
+      <span>⚡</span> Real-world example
+    </div>
+    <p style="font-size:.82rem;color:#555;margin-bottom:.5rem;line-height:1.55">When you search <em>"best running shoes"</em> on Google, TF-IDF ranks pages by keyword relevance. When you search Spotify or Netflix by mood, embeddings match your query by <strong>meaning</strong>, not exact words.</p>
+    <p>TF-IDF powers document ranking in search engines. Embeddings power semantic search — finding documents by meaning, not just keywords.</p>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <!-- WHAT IS NEURAL NETWORKS label -->
+    <div style="background:#0f1123;border-radius:8px;padding:.6rem .9rem;margin-bottom:.85rem;display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:1.3rem;line-height:1">🤖</span>
+      <div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#a5f3fc;margin-bottom:3px">What are Neural Networks?</div>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.75);line-height:1.5">Layered math models loosely inspired by the brain — they learn patterns from millions of examples. <em style="color:#fff">Feature vectors are the numbers they read as input.</em></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.65rem">
+      <span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">💬 ChatGPT / Claude</span>
+      <span style="background:#dbeafe;color:#1e40af;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">🌐 Google Translate</span>
+      <span style="background:#dcfce7;color:#166534;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700">🎤 Siri / Alexa</span>
+    </div>
+    <h3>Neural Networks</h3>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:3px 9px;margin:.45rem 0 .6rem;font-size:11px;font-weight:700;color:#92400e;letter-spacing:.03em">
+      <span>⚡</span> Real-world example
+    </div>
+    <p style="font-size:.82rem;color:#555;margin-bottom:.5rem;line-height:1.55">ChatGPT, BERT, and Google Translate all begin by converting each word into a dense embedding vector. Without this step, the neural network would have no numeric input to process.</p>
+    <p>Deep learning models need continuous, dense input. Word embeddings (Word2Vec, GloVe, BERT) provide the compressed semantic layer neural nets need.</p>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     SECTION 2 — VOCABULARY BUILDING
+══════════════════════════════════════ -->
+<div class="sec-title">Step 0 — Building the Vocabulary</div>
+
+<div class="step-card">
+  <div class="step-card-header">
+    <div class="step-num-badge">0</div>
+    <div>
+      <h3>Vocabulary Construction</h3>
+      <div class="step-sub">Every unique token across the corpus gets an index</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>Before any vector is created, every unique word across all documents in the corpus is collected into a <strong>vocabulary V</strong>. Each word maps to a fixed integer index. This index is what all downstream representations refer to.</p>
+    <p style="margin-top:.5rem"><strong>Vocabulary size matters enormously.</strong> A tiny corpus might have V=50; a full web-crawl corpus used to train BERT has V=30,000+ (subword tokens). Larger vocabulary = higher-dimensional vectors = more memory and compute.</p>
+    <p style="font-size:.78rem;color:#555;margin-top:.75rem;margin-bottom:.4rem">Hover over a word to see its index. Colour intensity = document frequency (how many docs contain this word).</p>
+    <div class="heatmap-grid" id="vocabHeatmap"></div>
+    <div class="info-box" id="vocabInfo">👆 Hover a word chip to see its vocabulary index and document frequency.</div>
+    <div class="two-col" style="margin-top:.9rem;margin-bottom:0">
+      <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.75rem 1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#991b1b;margin-bottom:.35rem">⚠️ Vocabulary challenges</p>
+        <ul style="font-size:.8rem;color:#7f1d1d;padding-left:1rem">
+          <li>Out-of-vocabulary (OOV) words at inference time</li>
+          <li>Vocabulary explosion with n-grams</li>
+          <li>Morphological variants ("run","runs","running") treated as different words</li>
+          <li>Sparse vectors when V is large</li>
+        </ul>
+      </div>
+      <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:.75rem 1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#166534;margin-bottom:.35rem">✅ Mitigation strategies</p>
+        <ul style="font-size:.8rem;color:#14532d;padding-left:1rem">
+          <li>Minimum frequency threshold (prune rare words)</li>
+          <li>&lt;UNK&gt; token for unseen words</li>
+          <li>Stemming / lemmatization before building vocab</li>
+          <li>Subword tokenization (BPE) for open-vocabulary coverage</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     SECTION 3 — BAG OF WORDS
+══════════════════════════════════════ -->
+<div class="sec-title">Method 1 — Bag of Words (BoW)</div>
+
+<div class="step-card">
+  <div class="step-card-header">
+    <div class="step-num-badge">1</div>
+    <div>
+      <h3>Bag of Words</h3>
+      <div class="step-sub">Count how often each vocabulary word appears — ignore all order</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>The <strong>Bag of Words</strong> model represents each document as a vector of word counts. The "bag" metaphor is intentional — you tip all the words into a bag, shake it, and count. Word order, grammar, and sentence structure are completely discarded.</p>
+    <p style="margin-top:.5rem">Despite its simplicity, BoW is surprisingly effective. A BoW vector + logistic regression classifier can achieve strong baselines on spam detection, topic classification, and sentiment analysis — often 85–90% accuracy on clean datasets.</p>
+    <p style="font-size:.78rem;color:#555;margin-top:.75rem;margin-bottom:.4rem">Select a document to see its BoW vector. Words with count > 0 are highlighted.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem" id="bowDocBtns"></div>
+    <div id="bowVizArea"></div>
+    <div class="mat-wrap" id="bowMatrixWrap">
+      <p style="font-size:.78rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">Full BoW Matrix — all 4 documents</p>
+    </div>
+    <div class="code-box">
+<span class="code-comment"># BoW with scikit-learn</span>
+<span class="code-kw">from</span> sklearn.feature_extraction.text <span class="code-kw">import</span> CountVectorizer
+corpus = [<span class="code-str">"the cat sat on the mat"</span>, <span class="code-str">"the dog sat on the log"</span>]
+vec = CountVectorizer()
+X = vec.fit_transform(corpus)
+print(vec.get_feature_names_out())  <span class="code-comment"># ['cat','dog','log','mat','on','sat','the']</span>
+print(X.toarray())  <span class="code-comment"># [[1,0,0,1,1,1,2], [0,1,1,0,1,1,2]]</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     SECTION 4 — N-GRAMS
+══════════════════════════════════════ -->
+<div class="sec-title">Method 2 — N-grams</div>
+
+<div class="step-card">
+  <div class="step-card-header">
+    <div class="step-num-badge">2</div>
+    <div>
+      <h3>N-grams</h3>
+      <div class="step-sub">Sequences of N consecutive words become single features — preserving local order</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>N-grams extend BoW by treating <strong>sequences of N consecutive words</strong> as a single feature. A unigram (N=1) is a single word; a bigram (N=2) is a pair; a trigram (N=3) is a triple. This restores some local word-order information that BoW throws away.</p>
+    <p style="margin-top:.5rem"><strong>Why this matters:</strong> "not good" and "good" are identical in BoW. As bigrams they're separate features — "not_good" vs "good" — and carry opposite sentiment signals. However, the vocabulary explodes: V unigrams become roughly V² bigrams and V³ trigrams, most of them sparse and useless.</p>
+    <p style="font-size:.78rem;color:#555;margin-top:.75rem;margin-bottom:.4rem">Click a document to extract and visualise its unigrams, bigrams, and trigrams.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem" id="ngramDocBtns"></div>
+    <div id="ngramVizArea"></div>
+    <div class="two-col" style="margin-top:.9rem;margin-bottom:0">
+      <div style="border:1.5px solid #c4b5fd;border-radius:10px;padding:1rem 1.1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">When bigrams help</p>
+        <ul style="font-size:.82rem;color:#444;padding-left:1rem">
+          <li>"not bad" → negative overridden to positive</li>
+          <li>"New York" → one entity, not two separate words</li>
+          <li>"ice cream" → compound noun with specific meaning</li>
+          <li>"machine learning" → technical compound term</li>
+        </ul>
+      </div>
+      <div style="border:1.5px solid #fca5a5;border-radius:10px;padding:1rem 1.1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">N-gram tradeoffs</p>
+        <ul style="font-size:.82rem;color:#444;padding-left:1rem">
+          <li>Vocabulary grows exponentially with N</li>
+          <li>Data sparsity — most n-grams appear only once</li>
+          <li>Memory and compute scale badly for N≥4</li>
+          <li>N=1 or N=2 covers 95% of practical use cases</li>
+        </ul>
+      </div>
+    </div>
+    <div class="code-box">
+<span class="code-comment"># N-grams with scikit-learn (unigrams + bigrams)</span>
+<span class="code-kw">from</span> sklearn.feature_extraction.text <span class="code-kw">import</span> CountVectorizer
+vec = CountVectorizer(ngram_range=(<span class="code-str">1</span>, <span class="code-str">2</span>))  <span class="code-comment"># includes both</span>
+X = vec.fit_transform(corpus)
+<span class="code-comment"># Features: ['bad', 'good', 'not', 'not bad', 'not good', ...]</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     SECTION 5 — TF-IDF
+══════════════════════════════════════ -->
+<div class="sec-title">Method 3 — TF-IDF</div>
+
+<div class="step-card">
+  <div class="step-card-header">
+    <div class="step-num-badge">3</div>
+    <div>
+      <h3>TF-IDF (Term Frequency — Inverse Document Frequency)</h3>
+      <div class="step-sub">Penalise common words, reward words that are unique to specific documents</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>BoW counts are biased toward frequent words like <em>"the"</em>, <em>"is"</em>, <em>"and"</em> — which are common everywhere and carry no discriminating signal. <strong>TF-IDF</strong> fixes this by scaling each word's count by how rare it is across the full corpus.</p>
+    <div class="two-col" style="margin-top:.75rem;margin-bottom:.75rem">
+      <div style="border:1.5px solid #86efac;border-radius:10px;padding:1rem 1.1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">TF — Term Frequency</p>
+        <p style="font-size:.82rem;color:#444;margin-bottom:.4rem">How often a word appears in <em>this</em> document (normalised by document length).</p>
+        <p style="font-family:'Courier New',monospace;font-size:.82rem;color:#065f46;background:#ccfbf1;padding:.4rem .7rem;border-radius:6px">TF(t,d) = count(t,d) / |d|</p>
+      </div>
+      <div style="border:1.5px solid #fcd34d;border-radius:10px;padding:1rem 1.1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">IDF — Inverse Document Frequency</p>
+        <p style="font-size:.82rem;color:#444;margin-bottom:.4rem">How rare this word is across the <em>entire corpus</em>. Rarer = higher IDF = higher weight.</p>
+        <p style="font-family:'Courier New',monospace;font-size:.82rem;color:#92400e;background:#fef3c7;padding:.4rem .7rem;border-radius:6px">IDF(t) = log((N+1)/(df(t)+1)) + 1</p>
+      </div>
+    </div>
+    <p style="font-size:.82rem;color:#444">The final score is <strong>TF × IDF</strong>. A word that appears 10 times in one document but appears in every document scores low. A word that appears 3 times in one document but rarely anywhere else scores high.</p>
+    <p style="font-size:.78rem;color:#555;margin-top:.75rem;margin-bottom:.75rem">Use the controls below to explore TF-IDF scores across different corpora and documents.</p>
+
+    <!-- INTERACTIVE TF-IDF EXPLORER -->
+    <div class="tfidf-controls">
+      <select id="tfidfCorpusSel">
+        <option value="news">News corpus</option>
+        <option value="reviews">Reviews corpus</option>
+        <option value="science">Science corpus</option>
+        <option value="tech">Tech corpus</option>
+      </select>
+      <select id="tfidfDocSel">
+        <option value="0">Document 1</option>
+        <option value="1">Document 2</option>
+        <option value="2">Document 3</option>
+      </select>
+      <button onclick="renderTFIDF()">Update</button>
+    </div>
+    <div id="tfidfDocDisplay" class="info-box" style="margin-top:0;margin-bottom:.75rem"></div>
+    <div id="tfidfBars"></div>
+
+    <div class="code-box">
+<span class="code-comment"># TF-IDF with scikit-learn</span>
+<span class="code-kw">from</span> sklearn.feature_extraction.text <span class="code-kw">import</span> TfidfVectorizer
+vec = TfidfVectorizer()
+X = vec.fit_transform(corpus)
+<span class="code-comment"># Words common across all docs score low (like "the")</span>
+<span class="code-comment"># Words unique to one doc score high — they're discriminative</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     SECTION 6 — ONE-HOT
+══════════════════════════════════════ -->
+<div class="sec-title">Method 4 — One-Hot Encoding</div>
+
+<div class="step-card">
+  <div class="step-card-header">
+    <div class="step-num-badge">4</div>
+    <div>
+      <h3>One-Hot Encoding</h3>
+      <div class="step-sub">Each word becomes a V-dimensional binary vector — exactly one 1, rest zeros</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>In one-hot encoding, every word in the vocabulary is represented as a V-dimensional binary vector. The vector is all zeros except at the word's vocabulary index, which is 1. This is the simplest possible word representation — it encodes <em>identity</em>, nothing else.</p>
+    <p style="margin-top:.5rem"><strong>The critical weakness:</strong> every word vector is <em>orthogonal</em> to every other. The cosine similarity between "cat" and "kitten" is exactly 0.0 — identical to the similarity between "cat" and "blockchain". The representation contains zero semantic information.</p>
+    <p style="font-size:.78rem;color:#555;margin-top:.75rem;margin-bottom:.4rem">Select words to see their one-hot vectors. Notice how unrelated words look structurally identical except for the position of the 1.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem" id="oheWordBtns"></div>
+    <div class="ohe-scroll"><table class="ohe-table" id="oheTable"></table></div>
+    <div class="two-col" style="margin-top:.9rem;margin-bottom:0">
+      <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.75rem 1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#991b1b;margin-bottom:.35rem">⚠️ One-hot limitations</p>
+        <ul style="font-size:.8rem;color:#7f1d1d;padding-left:1rem">
+          <li>Dimensionality = V (can be 50,000+)</li>
+          <li>All word vectors are orthogonal — no semantic similarity</li>
+          <li>No notion of "cat" being more similar to "dog" than to "algebra"</li>
+          <li>Cannot generalise to unseen words</li>
+        </ul>
+      </div>
+      <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:.75rem 1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#1e40af;margin-bottom:.35rem">✅ Where one-hot is still used</p>
+        <ul style="font-size:.8rem;color:#1e3a8a;padding-left:1rem">
+          <li>Input layer of neural networks before the embedding layer</li>
+          <li>Target labels in multi-class classification</li>
+          <li>Character-level models with small alphabets</li>
+          <li>Categorical feature encoding in traditional ML</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     SECTION 7 — WORD EMBEDDINGS
+══════════════════════════════════════ -->
+<div class="sec-title">Method 5 — Word Embeddings</div>
+
+<div class="step-card">
+  <div class="step-card-header">
+    <div class="step-num-badge">5</div>
+    <div>
+      <h3>Word Embeddings</h3>
+      <div class="step-sub">Dense low-dimensional vectors where geometric distance encodes semantic meaning</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>Word embeddings solve the orthogonality problem of one-hot encoding. They map every word to a <strong>dense, low-dimensional vector</strong> (typically 50–300 dimensions) learned from large text corpora. Words with similar meanings end up geometrically close in this vector space.</p>
+    <p style="margin-top:.5rem">The famous <strong>Word2Vec</strong> insight: <em>"king" − "man" + "woman" ≈ "queen"</em>. Semantic relationships become arithmetic in embedding space. This works because co-occurrence patterns in text encode meaning — words that appear in similar contexts carry similar meanings.</p>
+    <p style="font-size:.78rem;color:#555;margin-top:.75rem;margin-bottom:.4rem">2D projection of a semantic embedding space. Similar words cluster together. Click a word to see its nearest neighbours.</p>
+    <div class="emb-canvas-wrap"><canvas id="embCanvas" width="860" height="320"></canvas></div>
+    <div class="info-box" id="embInfo">👆 Click any word in the plot above to highlight its nearest semantic neighbours.</div>
+
+    <div class="two-col" style="margin-top:1rem;margin-bottom:.75rem">
+      <div style="border:1.5px solid #c4b5fd;border-radius:10px;padding:1rem 1.1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Static Embeddings</p>
+        <ul style="font-size:.82rem;color:#444;padding-left:1rem;margin-top:0">
+          <li><strong>Word2Vec</strong> — Skipgram / CBOW, predict context from word</li>
+          <li><strong>GloVe</strong> — Global co-occurrence matrix factorisation</li>
+          <li><strong>FastText</strong> — Subword-aware, handles OOV words via character n-grams</li>
+        </ul>
+        <p style="font-size:.78rem;color:#888;margin-top:.5rem">One vector per word — "bank" always maps to the same vector regardless of context.</p>
+      </div>
+      <div style="border:1.5px solid #86efac;border-radius:10px;padding:1rem 1.1rem">
+        <p style="font-size:.78rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Contextual Embeddings</p>
+        <ul style="font-size:.82rem;color:#444;padding-left:1rem;margin-top:0">
+          <li><strong>ELMo</strong> — BiLSTM-based, context-sensitive</li>
+          <li><strong>BERT</strong> — Transformer, bidirectional context</li>
+          <li><strong>GPT</strong> — Transformer, autoregressive</li>
+        </ul>
+        <p style="font-size:.78rem;color:#888;margin-top:.5rem">"bank" gets different vectors in "river bank" vs "investment bank" — context changes the representation.</p>
+      </div>
+    </div>
+    <div class="code-box">
+<span class="code-comment"># Static embeddings with Gensim (Word2Vec)</span>
+<span class="code-kw">from</span> gensim.models <span class="code-kw">import</span> Word2Vec
+sentences = [[<span class="code-str">"the"</span>, <span class="code-str">"cat"</span>, <span class="code-str">"sat"</span>], [<span class="code-str">"the"</span>, <span class="code-str">"dog"</span>, <span class="code-str">"ran"</span>]]
+model = Word2Vec(sentences, vector_size=<span class="code-str">100</span>, window=<span class="code-str">5</span>, min_count=<span class="code-str">1</span>)
+model.wv.most_similar(<span class="code-str">"cat"</span>)  <span class="code-comment"># → [("dog", 0.92), ("kitten", 0.88), ...]</span>
+
+<span class="code-comment"># Contextual embeddings with HuggingFace (BERT)</span>
+<span class="code-kw">from</span> transformers <span class="code-kw">import</span> AutoModel, AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained(<span class="code-str">"bert-base-uncased"</span>)
+model = AutoModel.from_pretrained(<span class="code-str">"bert-base-uncased"</span>)
+<span class="code-comment"># Each token gets a 768-dim context-aware vector</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     BONUS VIZ 1 — COSINE SIMILARITY
+══════════════════════════════════════ -->
+<div class="sec-title">Interactive — Cosine Similarity Explorer</div>
+
+<div class="card">
+  <h3>Measuring document similarity using feature vectors</h3>
+  <p>Once documents have numeric representations, we can measure how similar they are using <strong>cosine similarity</strong> — the cosine of the angle between two vectors. A score of 1.0 means identical, 0.0 means completely different.</p>
+  <p style="margin-top:.5rem;margin-bottom:.75rem">Cosine similarity is preferred over Euclidean distance because it is length-normalised — a short document and a long document on the same topic score high, whereas their Euclidean distance would be large.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+    <span style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em">Compare:</span>
+    <select id="simDoc1" style="padding:7px 12px;border-radius:8px;border:1.5px solid #e2e4ea;font-size:13px;font-family:inherit"></select>
+    <span style="font-size:13px;color:#888">vs</span>
+    <select id="simDoc2" style="padding:7px 12px;border-radius:8px;border:1.5px solid #e2e4ea;font-size:13px;font-family:inherit"></select>
+    <select id="simMethod" style="padding:7px 12px;border-radius:8px;border:1.5px solid #e2e4ea;font-size:13px;font-family:inherit">
+      <option value="bow">BoW vectors</option>
+      <option value="tfidf">TF-IDF vectors</option>
+    </select>
+    <button onclick="renderSim()" style="padding:7px 14px;border-radius:8px;border:none;background:#6c63ff;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Compute</button>
+  </div>
+  <div class="sim-grid" id="simDocDisplay"></div>
+  <div class="sim-score-wrap" id="simScoreWrap">
+    <div>
+      <div class="sim-score-num" id="simScoreNum">—</div>
+      <div class="sim-label">cosine similarity</div>
+    </div>
+    <div style="flex:1">
+      <div class="sim-score-bar-track"><div class="sim-score-bar-fill" id="simScoreBar" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:3px"><span>0.0 — unrelated</span><span>1.0 — identical</span></div>
+    </div>
+    <div id="simVerdict" style="font-size:.78rem;font-weight:700;padding:.4rem .8rem;border-radius:6px"></div>
+  </div>
+  <p style="font-size:.78rem;color:#888;margin-top:.75rem">cosine(A, B) = (A · B) / (|A| × |B|) — dot product divided by product of magnitudes. Range: [0, 1] for non-negative vectors.</p>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     BONUS VIZ 2 — COMPARISON TABLE
+══════════════════════════════════════ -->
+<div class="sec-title">Head-to-Head Comparison</div>
+
+<div class="card">
+  <h3>All five methods compared</h3>
+  <div class="mat-wrap">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Vector type</th>
+          <th>Preserves order?</th>
+          <th>Semantic similarity?</th>
+          <th>Handles OOV?</th>
+          <th>Best used for</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Bag of Words</strong></td>
+          <td>Sparse, integer counts</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td>Text classification baseline, topic modelling</td>
+        </tr>
+        <tr>
+          <td><strong>N-grams</strong></td>
+          <td>Sparse, integer counts</td>
+          <td><span class="badge-partial">Local only</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td>Sentiment analysis, language modelling</td>
+        </tr>
+        <tr>
+          <td><strong>TF-IDF</strong></td>
+          <td>Sparse, float weights</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td>Search/retrieval, document ranking, keyword extraction</td>
+        </tr>
+        <tr>
+          <td><strong>One-Hot</strong></td>
+          <td>Sparse, binary</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-no">No</span></td>
+          <td>NN input layer, categorical labels</td>
+        </tr>
+        <tr>
+          <td><strong>Word Embeddings</strong></td>
+          <td>Dense, float (50–768d)</td>
+          <td><span class="badge-partial">Contextual only</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+          <td><span class="badge-partial">FastText/BPE: Yes</span></td>
+          <td>NER, QA, semantic search, all deep learning NLP</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     BONUS VIZ 3 — RADAR CHART
+══════════════════════════════════════ -->
+<div class="sec-title">Head-to-Head — Radar Chart</div>
+
+<div class="card">
+  <h3>Multi-dimensional capability comparison</h3>
+
+  <div class="radar-why">
+    <strong>Why a radar chart?</strong> The comparison table above gives you a clear yes/no/partial view of individual properties, but it doesn't let you see <em>the overall shape</em> of each method's strengths and weaknesses at a glance. A radar chart places every dimension simultaneously on a single figure — you can instantly spot that Word Embeddings form a large, well-rounded polygon while Bag of Words is a flat sliver, without scanning rows and columns. It also makes <em>trade-offs visible</em>: the same area where one method shines is exactly where another method falls flat. Toggle methods on/off below to isolate comparisons and build intuition for which technique is suited to which task.
+  </div>
+
+  <div class="radar-controls" id="radarControls"></div>
+  <div class="radar-canvas-wrap">
+    <canvas id="radarCanvas" width="420" height="380" style="max-width:100%"></canvas>
+    <div class="radar-legend" id="radarLegend"></div>
+  </div>
+  <p style="font-size:.75rem;color:#999;margin-top:.6rem">Scores are normalised 0–5 across six capability axes. Hover over the chart to see exact scores. Click legend items to toggle methods.</p>
+</div>
+
+<div class="radar-tooltip" id="radarTooltip"></div>
+<div class="sec-title">Pipeline in Action — Full Worked Example</div>
+<div class="card">
+  <h3>Complete feature extraction pipeline</h3>
+  <p><strong>Corpus (3 documents):</strong></p>
+  <div class="info-box" style="margin-bottom:.75rem">
+    <div style="margin-bottom:4px"><strong>D1:</strong> "the cat sat on the mat"</div>
+    <div style="margin-bottom:4px"><strong>D2:</strong> "the dog sat on the log"</div>
+    <div><strong>D3:</strong> "the cat chased the dog"</div>
+  </div>
+  <h4 style="margin-top:12px;font-size:.875rem">Step 1 — Vocabulary (sorted alphabetically)</h4>
+  <div class="tokens-wrap" style="margin-bottom:.75rem" id="workedVocab"></div>
+  <h4 style="margin-top:8px;font-size:.875rem">Step 2 — BoW Matrix</h4>
+  <div class="mat-wrap" id="workedBoW"></div>
+  <h4 style="margin-top:12px;font-size:.875rem">Step 3 — TF-IDF Matrix</h4>
+  <div class="mat-wrap" id="workedTFIDF"></div>
+  <h4 style="margin-top:12px;font-size:.875rem">Step 4 — Bigrams for D1</h4>
+  <div class="tokens-wrap" id="workedBigrams"></div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════
+     QUIZ
+══════════════════════════════════════ -->
+<div class="sec-title">Quiz — Test Your Understanding</div>
+<div class="score-box">
+  <div class="score-big" id="scoreNum">0 / 7</div>
+  <div class="score-info">
+    <strong id="scoreTitle">Ready to test your knowledge?</strong>
+    <span id="scoreMsg">Answer all 7 questions below.</span>
+  </div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 1</div>
+  <div class="qtext">In the Bag of Words model, what happens to word order?</div>
+  <div class="opts" id="q1opts">
+    <button class="opt" onclick="pick(1,0,1,this)"><span class="opt-letter">A</span>It is encoded using position indices in the vector</button>
+    <button class="opt" onclick="pick(1,1,1,this)"><span class="opt-letter">B</span>It is completely discarded — only word frequencies are kept</button>
+    <button class="opt" onclick="pick(1,2,1,this)"><span class="opt-letter">C</span>It is preserved through special separator tokens</button>
+    <button class="opt" onclick="pick(1,3,1,this)"><span class="opt-letter">D</span>It is captured via the vocabulary index ordering</button>
+  </div>
+  <div class="qfeedback" id="q1fb"></div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 2</div>
+  <div class="qtext">Which feature extraction method would BEST distinguish the phrases "not good" from "very good" as separate features?</div>
+  <div class="opts" id="q2opts">
+    <button class="opt" onclick="pick(2,0,1,this)"><span class="opt-letter">A</span>Bag of Words (unigrams)</button>
+    <button class="opt" onclick="pick(2,1,1,this)"><span class="opt-letter">B</span>Bigrams (N=2)</button>
+    <button class="opt" onclick="pick(2,2,1,this)"><span class="opt-letter">C</span>TF-IDF</button>
+    <button class="opt" onclick="pick(2,3,1,this)"><span class="opt-letter">D</span>One-Hot Encoding</button>
+  </div>
+  <div class="qfeedback" id="q2fb"></div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 3</div>
+  <div class="qtext">A word appears in every document in the corpus. What is its TF-IDF score?</div>
+  <div class="opts" id="q3opts">
+    <button class="opt" onclick="pick(3,0,2,this)"><span class="opt-letter">A</span>High — it must be important if it appears everywhere</button>
+    <button class="opt" onclick="pick(3,1,2,this)"><span class="opt-letter">B</span>Equal to its raw term frequency in each document</button>
+    <button class="opt" onclick="pick(3,2,2,this)"><span class="opt-letter">C</span>Very low — the IDF component penalises words present in all documents</button>
+    <button class="opt" onclick="pick(3,3,2,this)"><span class="opt-letter">D</span>Exactly 1.0 regardless of frequency</button>
+  </div>
+  <div class="qfeedback" id="q3fb"></div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 4</div>
+  <div class="qtext">What is the cosine similarity between two one-hot word vectors representing "cat" and "dog" in the same vocabulary?</div>
+  <div class="opts" id="q4opts">
+    <button class="opt" onclick="pick(4,0,0,this)"><span class="opt-letter">A</span>0.0 — they are orthogonal; one-hot encodes no semantic similarity</button>
+    <button class="opt" onclick="pick(4,1,0,this)"><span class="opt-letter">B</span>0.5 — they are both animals so there's partial overlap</button>
+    <button class="opt" onclick="pick(4,2,0,this)"><span class="opt-letter">C</span>1.0 — all word vectors have the same magnitude so similarity is 1</button>
+    <button class="opt" onclick="pick(4,3,0,this)"><span class="opt-letter">D</span>Depends on how many shared characters the words have</button>
+  </div>
+  <div class="qfeedback" id="q4fb"></div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 5</div>
+  <div class="qtext">Word2Vec's famous analogy: king − man + woman ≈ queen. What does this demonstrate?</div>
+  <div class="opts" id="q5opts">
+    <button class="opt" onclick="pick(5,0,1,this)"><span class="opt-letter">A</span>That word vectors can be used to translate between languages</button>
+    <button class="opt" onclick="pick(5,1,1,this)"><span class="opt-letter">B</span>That semantic relationships are encoded as linear directions in embedding space</button>
+    <button class="opt" onclick="pick(5,2,1,this)"><span class="opt-letter">C</span>That embeddings memorise specific sentences from training data</button>
+    <button class="opt" onclick="pick(5,3,1,this)"><span class="opt-letter">D</span>That BoW vectors can capture gender relationships</button>
+  </div>
+  <div class="qfeedback" id="q5fb"></div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 6</div>
+  <div class="qtext">Why does vocabulary size grow problematically with N-grams as N increases?</div>
+  <div class="opts" id="q6opts">
+    <button class="opt" onclick="pick(6,0,2,this)"><span class="opt-letter">A</span>Because longer documents are required to fit all n-grams</button>
+    <button class="opt" onclick="pick(6,1,2,this)"><span class="opt-letter">B</span>Because punctuation tokens multiply the feature count</button>
+    <button class="opt" onclick="pick(6,2,2,this)"><span class="opt-letter">C</span>Because the number of possible word sequences grows exponentially — roughly V^N unique n-grams</button>
+    <button class="opt" onclick="pick(6,3,2,this)"><span class="opt-letter">D</span>Because stopwords must be kept for n-grams to work correctly</button>
+  </div>
+  <div class="qfeedback" id="q6fb"></div>
+</div>
+
+<div class="qcard">
+  <div class="qnum">Question 7</div>
+  <div class="qtext">Which statement best describes the difference between static and contextual word embeddings?</div>
+  <div class="opts" id="q7opts">
+    <button class="opt" onclick="pick(7,0,2,this)"><span class="opt-letter">A</span>Static embeddings use more dimensions than contextual embeddings</button>
+    <button class="opt" onclick="pick(7,1,2,this)"><span class="opt-letter">B</span>Contextual embeddings only work on short sentences; static work on any length</button>
+    <button class="opt" onclick="pick(7,2,2,this)"><span class="opt-letter">C</span>Static embeddings assign one fixed vector per word; contextual embeddings produce different vectors for the same word depending on its surrounding context</button>
+    <button class="opt" onclick="pick(7,3,2,this)"><span class="opt-letter">D</span>Static embeddings are always more accurate because they train on more data</button>
+  </div>
+  <div class="qfeedback" id="q7fb"></div>
+</div>
+
+</div><!-- /page -->
+
+<script>
+/* ═══════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════ */
+const CORPORA = {
+  news:    ["the cat sat on the mat", "the dog sat on the log", "the cat chased the dog"],
+  reviews: ["great product love it", "bad product hate it", "great service love it"],
+  science: ["cells divide and grow", "cells contain dna and rna", "dna encodes genetic data"],
+  tech:    ["neural networks learn patterns", "deep learning needs data", "patterns emerge from data"]
+};
+
+const SIM_DOCS = [
+  "the cat sat on the mat",
+  "the dog sat on the log",
+  "the cat chased the dog",
+  "neural networks learn patterns",
+  "deep learning needs data",
+  "great product love it",
+  "bad product hate it"
+];
+
+/* ═══════════════════════════════════════════════
+   MATH HELPERS
+═══════════════════════════════════════════════ */
+function buildVocab(docs) {
+  return [...new Set(docs.flatMap(d => d.split(' ')))].sort();
+}
+function bowVec(doc, voc) {
+  const counts = {};
+  doc.split(' ').forEach(w => counts[w] = (counts[w]||0) + 1);
+  return voc.map(w => counts[w] || 0);
+}
+function tfidfMat(docs, voc) {
+  const N = docs.length;
+  const tf = docs.map(d => bowVec(d, voc).map(c => c / d.split(' ').length));
+  const df = voc.map((_, i) => docs.filter(d => d.split(' ').includes(voc[i])).length);
+  const idf = df.map(d => Math.log((N+1)/(d+1)) + 1);
+  return tf.map(row => row.map((v, i) => +(v * idf[i]).toFixed(3)));
+}
+function ngrams(doc, n) {
+  const t = doc.split(' ');
+  const out = [];
+  for (let i = 0; i <= t.length - n; i++) out.push(t.slice(i,i+n).join(' '));
+  return out;
+}
+function cosineSim(a, b) {
+  const dot = a.reduce((s,v,i) => s + v*b[i], 0);
+  const ma  = Math.sqrt(a.reduce((s,v) => s + v*v, 0));
+  const mb  = Math.sqrt(b.reduce((s,v) => s + v*v, 0));
+  if (!ma || !mb) return 0;
+  return +(dot / (ma*mb)).toFixed(3);
+}
+
+/* ═══════════════════════════════════════════════
+   VOCAB HEATMAP
+═══════════════════════════════════════════════ */
+(function() {
+  const docs = CORPORA.news;
+  const voc  = buildVocab(docs);
+  const df   = voc.map(w => docs.filter(d => d.split(' ').includes(w)).length);
+  const maxDf = Math.max(...df);
+  const wrap = document.getElementById('vocabHeatmap');
+  const info = document.getElementById('vocabInfo');
+  voc.forEach((w, i) => {
+    const ratio = df[i] / maxDf;
+    const r = Math.round(108 + ratio * (79-108));
+    const g = Math.round(99  + ratio * (50-99));
+    const b = 255;
+    const alpha = 0.15 + ratio * 0.65;
+    const cell = document.createElement('div');
+    cell.className = 'hm-cell';
+    cell.textContent = w;
+    cell.style.background = `rgba(${r},${g},${b},${alpha})`;
+    cell.style.color = ratio > 0.5 ? '#3730a3' : '#6b7280';
+    cell.style.borderColor = `rgba(${r},${g},${b},${alpha+.2})`;
+    cell.addEventListener('mouseenter', () => {
+      info.innerHTML = `<strong>[${i}] "${w}"</strong> &nbsp;·&nbsp; vocab index: <strong>${i}</strong> &nbsp;·&nbsp; document frequency: <strong>${df[i]} / ${docs.length} docs</strong> &nbsp;·&nbsp; ${df[i]===maxDf ? '🔴 Very common — low IDF' : df[i]===1 ? '🟢 Unique to one doc — high IDF' : '🟡 Moderate frequency'}`;
+    });
+    wrap.appendChild(cell);
+  });
+})();
+
+/* ═══════════════════════════════════════════════
+   BOW VISUALISER
+═══════════════════════════════════════════════ */
+const BOW_CORPUS = CORPORA.news;
+const BOW_VOC    = buildVocab(BOW_CORPUS);
+const BOW_MATS   = BOW_CORPUS.map(d => bowVec(d, BOW_VOC));
+
+function renderBowDoc(idx) {
+  const vec = BOW_MATS[idx];
+  const max = Math.max(...vec, 1);
+  const colors = ['#6c63ff','#10b981','#f59e0b'];
+  let html = `<div style="font-family:'Courier New',monospace;font-size:12px;padding:.5rem .85rem;background:#f7f8fc;border-radius:8px;margin-bottom:.9rem;border:1px solid #e2e4ea">"${BOW_CORPUS[idx]}"</div>`;
+  BOW_VOC.forEach((w, i) => {
+    const pct = Math.round(vec[i]/max*100);
+    html += `<div class="viz-bar-row">
+      <div class="viz-bar-label">${w}</div>
+      <div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%;background:${vec[i]>0?colors[idx]:'#e2e4ea'}"></div></div>
+      <div class="viz-bar-val" style="color:${vec[i]>0?colors[idx]:'#aaa'}">${vec[i]}</div>
+    </div>`;
+  });
+  document.getElementById('bowVizArea').innerHTML = html;
+}
+
+// Build buttons + matrix
+(function() {
+  const btns = document.getElementById('bowDocBtns');
+  BOW_CORPUS.forEach((d, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = `Doc ${i+1}: "${d.length>22?d.slice(0,22)+'…':d}"`;
+    btn.style.cssText = 'padding:6px 14px;border-radius:8px;border:1.5px solid #e2e4ea;background:#fff;font-size:12px;font-family:inherit;cursor:pointer;font-weight:500;color:#1a1a2e;transition:all .15s';
+    btn.onclick = () => {
+      document.querySelectorAll('#bowDocBtns button').forEach(b => { b.style.background='#fff'; b.style.borderColor='#e2e4ea'; b.style.color='#1a1a2e'; });
+      btn.style.background='#6c63ff'; btn.style.borderColor='#6c63ff'; btn.style.color='#fff';
+      renderBowDoc(i);
+    };
+    btns.appendChild(btn);
+  });
+  btns.children[0].click();
+
+  // Matrix
+  const wrap = document.getElementById('bowMatrixWrap');
+  let html = '<table class="mat-table"><thead><tr><th>Doc</th>' + BOW_VOC.map(w=>`<th>${w}</th>`).join('') + '</tr></thead><tbody>';
+  BOW_MATS.forEach((vec, di) => {
+    html += `<tr><td class="row-lbl">D${di+1}</td>` + vec.map(v => `<td class="${v>0?'hi':'zero'}">${v}</td>`).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML += html;
+})();
+
+/* ═══════════════════════════════════════════════
+   N-GRAM VISUALISER
+═══════════════════════════════════════════════ */
+const NGRAM_CORPUS = CORPORA.news;
+function renderNgramDoc(idx) {
+  const doc = NGRAM_CORPUS[idx];
+  const uni = ngrams(doc, 1);
+  const bi  = ngrams(doc, 2);
+  const tri = ngrams(doc, 3);
+  const colors = ['t-teal','t-purple','t-blue'];
+  const makeChips = (arr, cls) => arr.map(w => `<div class="tok ${cls}"><span class="tok-word">${w}</span><span class="tok-tag">N=${w.split(' ').length}</span></div>`).join('');
+  document.getElementById('ngramVizArea').innerHTML = `
+    <div style="font-family:'Courier New',monospace;font-size:12px;padding:.5rem .85rem;background:#f7f8fc;border-radius:8px;margin-bottom:.85rem;border:1px solid #e2e4ea">"${doc}"</div>
+    <div class="ngram-section"><div class="ngram-label">Unigrams (N=1) — ${uni.length} features</div><div class="tokens-wrap">${makeChips(uni,'t-teal')}</div></div>
+    <div class="ngram-section"><div class="ngram-label">Bigrams (N=2) — ${bi.length} features</div><div class="tokens-wrap">${makeChips(bi,'t-purple')}</div></div>
+    <div class="ngram-section"><div class="ngram-label">Trigrams (N=3) — ${tri.length} features</div><div class="tokens-wrap">${makeChips(tri,'t-blue')}</div></div>
+    <div style="margin-top:.5rem;font-size:.78rem;color:#888">📈 Vocabulary would grow from <strong>${uni.length}</strong> unigrams → ~<strong>${bi.length}</strong> bigrams → ~<strong>${tri.length}</strong> trigrams just for this one sentence</div>
+  `;
+}
+(function() {
+  const btns = document.getElementById('ngramDocBtns');
+  NGRAM_CORPUS.forEach((d, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = `Doc ${i+1}`;
+    btn.style.cssText = 'padding:6px 14px;border-radius:8px;border:1.5px solid #e2e4ea;background:#fff;font-size:12px;font-family:inherit;cursor:pointer;font-weight:500;color:#1a1a2e';
+    btn.onclick = () => {
+      document.querySelectorAll('#ngramDocBtns button').forEach(b => { b.style.background='#fff'; b.style.borderColor='#e2e4ea'; b.style.color='#1a1a2e'; });
+      btn.style.background='#1D9E75'; btn.style.borderColor='#1D9E75'; btn.style.color='#fff';
+      renderNgramDoc(i);
+    };
+    btns.appendChild(btn);
+  });
+  btns.children[0].click();
+})();
+
+/* ═══════════════════════════════════════════════
+   TF-IDF EXPLORER
+═══════════════════════════════════════════════ */
+function renderTFIDF() {
+  const key = document.getElementById('tfidfCorpusSel').value;
+  const docIdx = parseInt(document.getElementById('tfidfDocSel').value);
+  const docs = CORPORA[key];
+  const voc  = buildVocab(docs);
+  const mat  = tfidfMat(docs, voc);
+  const vec  = mat[docIdx];
+  const max  = Math.max(...vec, 0.001);
+  const sorted = voc.map((w,i) => ({w, score: vec[i]})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+
+  document.getElementById('tfidfDocDisplay').innerHTML = `<strong>Doc ${docIdx+1}:</strong> "${docs[docIdx]}"`;
+
+  let html = '';
+  sorted.forEach(({w, score}) => {
+    const pct = Math.round(score/max*100);
+    html += `<div class="viz-bar-row">
+      <div class="viz-bar-label">${w}</div>
+      <div class="viz-bar-track"><div class="viz-bar-fill" style="width:${pct}%;background:#f59e0b"></div></div>
+      <div class="viz-bar-val" style="color:#92400e">${score}</div>
+    </div>`;
+  });
+  // zero-scoring words
+  voc.filter((_,i)=>vec[i]===0).forEach(w => {
+    html += `<div class="viz-bar-row">
+      <div class="viz-bar-label" style="color:#aaa">${w}</div>
+      <div class="viz-bar-track"><div class="viz-bar-fill" style="width:0%;background:#e2e4ea"></div></div>
+      <div class="viz-bar-val" style="color:#aaa">0.000</div>
+    </div>`;
+  });
+  document.getElementById('tfidfBars').innerHTML = html;
+}
+renderTFIDF();
+
+/* ═══════════════════════════════════════════════
+   ONE-HOT DEMO
+═══════════════════════════════════════════════ */
+(function() {
+  const docs = CORPORA.news;
+  const voc  = buildVocab(docs);
+  let selected = voc.slice(0, 3);
+
+  function buildOheTable() {
+    let html = '<thead><tr><th style="text-align:left;min-width:80px">word</th>';
+    voc.forEach((w,i) => html += `<th title="${w}">[${i}]</th>`);
+    html += '</tr></thead><tbody>';
+    selected.forEach(word => {
+      html += `<tr><td class="word-col">${word}</td>`;
+      voc.forEach(w => html += `<td class="${w===word?'one':'zero'}">${w===word?1:0}</td>`);
+      html += '</tr>';
+    });
+    html += '</tbody>';
+    document.getElementById('oheTable').innerHTML = html;
+  }
+
+  const btns = document.getElementById('oheWordBtns');
+  voc.forEach(w => {
+    const btn = document.createElement('button');
+    btn.textContent = w;
+    btn.style.cssText = 'padding:5px 12px;border-radius:6px;border:1.5px solid #e2e4ea;background:#fff;font-size:12px;font-family:inherit;cursor:pointer;font-weight:500;color:#1a1a2e;transition:all .15s';
+    if (selected.includes(w)) { btn.style.background='#fee2e2'; btn.style.borderColor='#fca5a5'; btn.style.color='#991b1b'; }
+    btn.onclick = () => {
+      if (selected.includes(w)) {
+        if (selected.length > 1) { selected = selected.filter(x=>x!==w); btn.style.background='#fff'; btn.style.borderColor='#e2e4ea'; btn.style.color='#1a1a2e'; }
+      } else {
+        selected.push(w); btn.style.background='#fee2e2'; btn.style.borderColor='#fca5a5'; btn.style.color='#991b1b';
+      }
+      buildOheTable();
+    };
+    btns.appendChild(btn);
+  });
+  buildOheTable();
+})();
+
+/* ═══════════════════════════════════════════════
+   EMBEDDING SCATTER PLOT
+═══════════════════════════════════════════════ */
+(function() {
+  // Illustrative 2D positions capturing semantic clusters
+  const WORDS = [
+    {w:'cat',    x:0.12, y:0.35, group:0},
+    {w:'dog',    x:0.18, y:0.28, group:0},
+    {w:'kitten', x:0.08, y:0.42, group:0},
+    {w:'puppy',  x:0.22, y:0.22, group:0},
+    {w:'animal', x:0.15, y:0.55, group:0},
+    {w:'lion',   x:0.28, y:0.38, group:0},
+    {w:'run',    x:0.55, y:0.30, group:1},
+    {w:'walk',   x:0.60, y:0.38, group:1},
+    {w:'jump',   x:0.50, y:0.22, group:1},
+    {w:'sprint', x:0.63, y:0.25, group:1},
+    {w:'move',   x:0.58, y:0.45, group:1},
+    {w:'king',   x:0.82, y:0.20, group:2},
+    {w:'queen',  x:0.88, y:0.28, group:2},
+    {w:'man',    x:0.78, y:0.30, group:2},
+    {w:'woman',  x:0.85, y:0.38, group:2},
+    {w:'prince', x:0.75, y:0.22, group:2},
+    {w:'sat',    x:0.38, y:0.65, group:3},
+    {w:'on',     x:0.42, y:0.72, group:3},
+    {w:'the',    x:0.35, y:0.78, group:3},
+    {w:'mat',    x:0.45, y:0.60, group:3},
+    {w:'log',    x:0.32, y:0.60, group:3},
+  ];
+  const GROUP_COLORS = ['#6c63ff','#10b981','#f59e0b','#64748b'];
+  const GROUP_NAMES  = ['Animals','Actions','Royalty/Gender','Function'];
+
+  const canvas  = document.getElementById('embCanvas');
+  const ctx     = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  let selectedWord = null;
+
+  function dist(a, b) {
+    return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    // background
+    ctx.fillStyle = '#f7f8fc';
+    ctx.fillRect(0,0,W,H);
+
+    // grid lines
+    ctx.strokeStyle = '#e2e4ea';
+    ctx.lineWidth = 1;
+    for (let x = 0.2; x < 1; x += 0.2) { ctx.beginPath(); ctx.moveTo(x*W, 0); ctx.lineTo(x*W, H); ctx.stroke(); }
+    for (let y = 0.2; y < 1; y += 0.2) { ctx.beginPath(); ctx.moveTo(0, y*H); ctx.lineTo(W, y*H); ctx.stroke(); }
+
+    const sw = selectedWord;
+    let neighbours = [];
+    if (sw) {
+      const sorted = [...WORDS].filter(w=>w.w!==sw.w).sort((a,b)=>dist(a,sw)-dist(b,sw));
+      neighbours = sorted.slice(0,3);
+      // draw lines to neighbours
+      neighbours.forEach(n => {
+        ctx.strokeStyle = GROUP_COLORS[sw.group] + '66';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(sw.x*W, sw.y*H); ctx.lineTo(n.x*W, n.y*H); ctx.stroke();
+        ctx.setLineDash([]);
+      });
+    }
+
+    WORDS.forEach(pt => {
+      const px = pt.x * W, py = pt.y * H;
+      const isSelected = sw && sw.w === pt.w;
+      const isNeighbour = neighbours.some(n=>n.w===pt.w);
+      const col = GROUP_COLORS[pt.group];
+      const r = isSelected ? 10 : (isNeighbour ? 8 : 6);
+
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI*2);
+      ctx.fillStyle = isSelected ? col : (isNeighbour ? col+'cc' : col+'88');
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = isSelected ? 2.5 : 1.5;
+      ctx.stroke();
+
+      ctx.font = `${isSelected||isNeighbour?'700 ':'500 '}12px 'Segoe UI', sans-serif`;
+      ctx.fillStyle = isSelected ? '#0f1123' : (isNeighbour ? col : '#6b7280');
+      ctx.fillText(pt.w, px + r + 3, py + 4);
+    });
+
+    // legend
+    GROUP_NAMES.forEach((name, i) => {
+      const x = 10 + i * 170, y = H - 14;
+      ctx.beginPath(); ctx.arc(x+6, y, 5, 0, Math.PI*2);
+      ctx.fillStyle = GROUP_COLORS[i]; ctx.fill();
+      ctx.font = '500 11px Segoe UI'; ctx.fillStyle = '#6b7280';
+      ctx.fillText(name, x+14, y+4);
+    });
+  }
+
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top)  * (H / rect.height);
+    let closest = null, minD = 999;
+    WORDS.forEach(pt => {
+      const d = Math.sqrt((pt.x*W-mx)**2 + (pt.y*H-my)**2);
+      if (d < minD) { minD = d; closest = pt; }
+    });
+    if (minD < 24) {
+      selectedWord = (selectedWord && selectedWord.w === closest.w) ? null : closest;
+      if (selectedWord) {
+        const neighbours = [...WORDS].filter(w=>w.w!==selectedWord.w).sort((a,b)=>dist(a,selectedWord)-dist(b,selectedWord)).slice(0,3);
+        document.getElementById('embInfo').innerHTML = `<strong>"${selectedWord.w}"</strong> — group: <em>${GROUP_NAMES[selectedWord.group]}</em> &nbsp;·&nbsp; Nearest neighbours: <strong>${neighbours.map(n=>n.w).join(', ')}</strong> &nbsp;·&nbsp; These words appear in similar contexts and cluster nearby in embedding space.`;
+      } else {
+        document.getElementById('embInfo').textContent = '👆 Click any word in the plot above to highlight its nearest semantic neighbours.';
+      }
+    }
+    draw();
+  });
+
+  // Resize canvas for display
+  const dpr = window.devicePixelRatio || 1;
+  draw();
+})();
+
+/* ═══════════════════════════════════════════════
+   COSINE SIMILARITY EXPLORER
+═══════════════════════════════════════════════ */
+(function() {
+  const sel1 = document.getElementById('simDoc1');
+  const sel2 = document.getElementById('simDoc2');
+  SIM_DOCS.forEach((d, i) => {
+    const o1 = new Option(`D${i+1}: "${d.length>30?d.slice(0,30)+'…':d}"`, i);
+    const o2 = new Option(`D${i+1}: "${d.length>30?d.slice(0,30)+'…':d}"`, i);
+    sel1.appendChild(o1); sel2.appendChild(o2);
+  });
+  sel2.value = '1';
+})();
+
+function renderSim() {
+  const i1  = parseInt(document.getElementById('simDoc1').value);
+  const i2  = parseInt(document.getElementById('simDoc2').value);
+  const method = document.getElementById('simMethod').value;
+  const d1  = SIM_DOCS[i1], d2 = SIM_DOCS[i2];
+  const voc = buildVocab([d1, d2]);
+  let v1, v2;
+  if (method === 'bow') { v1 = bowVec(d1, voc); v2 = bowVec(d2, voc); }
+  else { const mat = tfidfMat([d1,d2], voc); v1 = mat[0]; v2 = mat[1]; }
+  const score = cosineSim(v1, v2);
+
+  document.getElementById('simDocDisplay').innerHTML = `
+    <div class="sim-doc"><strong>Document A</strong>${d1}</div>
+    <div class="sim-doc"><strong>Document B</strong>${d2}</div>`;
+
+  const pct  = Math.round(score * 100);
+  const col  = score >= 0.7 ? '#10b981' : score >= 0.3 ? '#f59e0b' : '#6c63ff';
+  const label = score >= 0.7 ? '🟢 Highly similar' : score >= 0.3 ? '🟡 Somewhat similar' : '🔵 Dissimilar';
+  document.getElementById('simScoreNum').textContent  = score.toFixed(3);
+  document.getElementById('simScoreNum').style.color  = col;
+  document.getElementById('simScoreBar').style.width  = pct + '%';
+  document.getElementById('simScoreBar').style.background = col;
+  document.getElementById('simVerdict').textContent   = label;
+  document.getElementById('simVerdict').style.background = col + '22';
+  document.getElementById('simVerdict').style.color   = col;
+}
+renderSim();
+
+/* ═══════════════════════════════════════════════
+   WORKED EXAMPLE
+═══════════════════════════════════════════════ */
+(function() {
+  const docs = CORPORA.news;
+  const voc  = buildVocab(docs);
+  const bows = docs.map(d => bowVec(d, voc));
+  const tfmat= tfidfMat(docs, voc);
+
+  // Vocab chips
+  const vocWrap = document.getElementById('workedVocab');
+  voc.forEach((w,i) => {
+    vocWrap.innerHTML += `<div class="tok t-purple"><span class="tok-word">${w}</span><span class="tok-tag">[${i}]</span></div>`;
+  });
+
+  // BoW matrix
+  let html = '<table class="mat-table"><thead><tr><th>Doc</th>' + voc.map(w=>`<th>${w}</th>`).join('') + '</tr></thead><tbody>';
+  bows.forEach((vec,di) => {
+    html += `<tr><td class="row-lbl">D${di+1}</td>` + vec.map((v,j) => `<td class="${v>0?(di===0?'hi':di===1?'hi2':'hi3'):'zero'}">${v}</td>`).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('workedBoW').innerHTML = html;
+
+  // TF-IDF matrix
+  let html2 = '<table class="mat-table"><thead><tr><th>Doc</th>' + voc.map(w=>`<th>${w}</th>`).join('') + '</tr></thead><tbody>';
+  tfmat.forEach((vec,di) => {
+    html2 += `<tr><td class="row-lbl">D${di+1}</td>` + vec.map((v,j) => {
+      const cls = v===0?'zero':di===0?'hi':di===1?'hi2':'hi3';
+      return `<td class="${cls}">${v.toFixed(3)}</td>`;
+    }).join('') + '</tr>';
+  });
+  html2 += '</tbody></table>';
+  document.getElementById('workedTFIDF').innerHTML = html2;
+
+  // Bigrams for D1
+  const biWrap = document.getElementById('workedBigrams');
+  ngrams(docs[0], 2).forEach(bg => {
+    biWrap.innerHTML += `<div class="tok t-amber"><span class="tok-word">${bg}</span><span class="tok-tag">2-gram</span></div>`;
+  });
+})();
+
+/* ═══════════════════════════════════════════════
+   RADAR CHART
+═══════════════════════════════════════════════ */
+(function() {
+  const METHODS = [
+    { name: 'Bag of Words',    color: '#6c63ff', scores: [2, 0, 0, 0, 1, 3] },
+    { name: 'N-grams',         color: '#f59e0b', scores: [2, 1, 0, 0, 1, 3] },
+    { name: 'TF-IDF',          color: '#10b981', scores: [3, 0, 0, 0, 2, 4] },
+    { name: 'One-Hot',         color: '#ef4444', scores: [1, 0, 0, 0, 1, 2] },
+    { name: 'Word Embeddings', color: '#3b82f6', scores: [4, 3, 5, 4, 4, 5] }
+  ];
+  const AXES = ['Discriminability', 'Order Awareness', 'Semantic Similarity', 'OOV Handling', 'Scalability', 'Downstream Performance'];
+  const MAX = 5;
+  const N = AXES.length;
+  const active = new Set(METHODS.map((_,i) => i));
+
+  // Controls
+  const ctrl = document.getElementById('radarControls');
+  METHODS.forEach((m,i) => {
+    const btn = document.createElement('button');
+    btn.textContent = m.name;
+    btn.className = 'active';
+    btn.style.borderColor = m.color;
+    btn.addEventListener('click', () => {
+      if (active.has(i)) { active.delete(i); btn.classList.remove('active'); btn.style.background=''; btn.style.color=''; btn.style.borderColor=m.color; }
+      else { active.add(i); btn.classList.add('active'); btn.style.background=m.color; btn.style.color='#fff'; btn.style.borderColor=m.color; }
+      draw();
+    });
+    btn.style.background = m.color;
+    btn.style.color = '#fff';
+    ctrl.appendChild(btn);
+  });
+
+  // Legend
+  const leg = document.getElementById('radarLegend');
+  METHODS.forEach((m,i) => {
+    const item = document.createElement('div');
+    item.className = 'radar-leg-item';
+    item.innerHTML = `<div class="radar-leg-swatch" style="background:${m.color}"></div><span>${m.name}</span>`;
+    item.addEventListener('click', () => {
+      const btn = ctrl.children[i];
+      btn.click();
+    });
+    leg.appendChild(item);
+  });
+
+  const canvas = document.getElementById('radarCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2 + 10;
+  const R = Math.min(W, H) * 0.36;
+
+  function angleFor(i) { return (Math.PI * 2 * i / N) - Math.PI / 2; }
+  function pointFor(i, val) {
+    const a = angleFor(i);
+    const r = (val / MAX) * R;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // Grid rings
+    for (let r = 1; r <= MAX; r++) {
+      ctx.beginPath();
+      for (let i = 0; i < N; i++) {
+        const a = angleFor(i);
+        const rx = cx + (r / MAX) * R * Math.cos(a);
+        const ry = cy + (r / MAX) * R * Math.sin(a);
+        i === 0 ? ctx.moveTo(rx, ry) : ctx.lineTo(rx, ry);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = r === MAX ? '#d1d5db' : '#e9eaec';
+      ctx.lineWidth = r === MAX ? 1.5 : 1;
+      ctx.stroke();
+    }
+    // Spokes
+    for (let i = 0; i < N; i++) {
+      const a = angleFor(i);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // Axis labels
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 11px "Segoe UI",system-ui,sans-serif';
+    for (let i = 0; i < N; i++) {
+      const a = angleFor(i);
+      const lx = cx + (R + 28) * Math.cos(a);
+      const ly = cy + (R + 28) * Math.sin(a);
+      ctx.fillStyle = '#555';
+      const words = AXES[i].split(' ');
+      if (words.length > 1) {
+        ctx.fillText(words[0], lx, ly - 7);
+        ctx.fillText(words.slice(1).join(' '), lx, ly + 7);
+      } else {
+        ctx.fillText(AXES[i], lx, ly);
+      }
+    }
+    // Method polygons
+    METHODS.forEach((m, mi) => {
+      if (!active.has(mi)) return;
+      ctx.beginPath();
+      for (let i = 0; i < N; i++) {
+        const p = pointFor(i, m.scores[i]);
+        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = m.color + '28';
+      ctx.fill();
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      // Dots
+      for (let i = 0; i < N; i++) {
+        const p = pointFor(i, m.scores[i]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = m.color;
+        ctx.fill();
+      }
+    });
+  }
+
+  draw();
+
+  // Tooltip on hover
+  const tooltip = document.getElementById('radarTooltip');
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    let closest = null, closestDist = 18;
+    METHODS.forEach((m, mi) => {
+      if (!active.has(mi)) return;
+      for (let i = 0; i < N; i++) {
+        const p = pointFor(i, m.scores[i]);
+        const d = Math.hypot(mx - p.x, my - p.y);
+        if (d < closestDist) { closestDist = d; closest = { m, axis: AXES[i], score: m.scores[i] }; }
+      }
+    });
+    if (closest) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+      tooltip.innerHTML = `<span style="color:${closest.m.color}">${closest.m.name}</span><br>${closest.axis}: <strong>${closest.score} / ${MAX}</strong>`;
+    } else {
+      tooltip.style.display = 'none';
+    }
+  });
+  canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+})();
+
+/* ═══════════════════════════════════════════════
+   QUIZ
+═══════════════════════════════════════════════ */
+const EXP = {
+  1: { text: [
+    'Position indices are not tracked in BoW — that would be positional encoding, used in Transformers.',
+    '✅ Correct! BoW literally puts all words in a "bag" and counts them. "The cat sat on the mat" and "the mat sat on the cat" produce identical BoW vectors — order is completely lost.',
+    'BoW does not use separator tokens. That concept belongs to Transformer tokenization.',
+    'Vocabulary indices are assigned alphabetically or by frequency — they do not encode word position within a document.'
+  ]},
+  2: { text: [
+    'BoW unigrams would treat "not" and "good" as separate independent features, missing their combined meaning entirely.',
+    '✅ Correct! Bigrams (N=2) would create "not good" and "very good" as two distinct features — capturing the local word pair and preserving the different meanings. This is exactly why N-grams help sentiment analysis.',
+    'TF-IDF weights existing features by importance but does not change which features exist — it still uses individual word counts, not phrases.',
+    'One-Hot encodes individual word identity — it would encode "not", "good", and "very" separately with no relationship between them.'
+  ]},
+  3: { text: [
+    'Appearing in every document is actually a signal that it is NOT discriminative. TF-IDF penalises this.',
+    'That would just be raw TF — TF-IDF multiplies TF by IDF, which approaches near-zero for universal words.',
+    '✅ Correct! IDF = log((N+1)/(df+1)) + 1. When df = N (appears in all documents), IDF ≈ 1.0, and when scaled by TF (which is small for any single word), the score is near zero. Words like "the", "is", "a" score near 0 in TF-IDF.',
+    'TF-IDF scores are continuous floats — there is no fixed 1.0 rule.'
+  ]},
+  4: { text: [
+    '✅ Correct! In one-hot encoding, every word gets a vector with exactly one 1 at its unique vocabulary index. "Cat" and "dog" have their 1s at different indices — their dot product is 0, so cosine similarity = 0. No semantic information is encoded at all.',
+    'One-hot vectors encode no semantic content — being "both animals" is a human concept that one-hot representation cannot capture.',
+    'Cosine similarity measures the angle between vectors. All one-hot vectors have the same magnitude (1.0), but different 1 positions mean their dot product is 0, giving cosine similarity = 0.',
+    'One-hot vectors are purely positional — character overlap has no effect whatsoever.'
+  ]},
+  5: { text: [
+    'This analogy is about semantic relationships, not cross-lingual translation — different models handle that.',
+    '✅ Correct! The "king − man + woman ≈ queen" analogy demonstrates that gender is encoded as a direction in embedding space (man→woman), and royalty as another direction (king→queen). Semantic relationships become geometric, allowing arithmetic manipulation of meaning.',
+    'Embeddings learn statistical patterns across billions of words — they generalise relationships, not memorise sentences.',
+    'BoW vectors cannot perform arithmetic on semantic relationships because all words are independently encoded with no shared structure.'
+  ]},
+  6: { text: [
+    'Document length affects the density of n-gram features but is not why vocabulary explodes.',
+    'Punctuation is a small constant factor — it does not cause exponential growth.',
+    '✅ Correct! For a vocabulary of size V, unigrams give V features. Bigrams could produce up to V² distinct pairs, trigrams V³, and so on. Even with pruning, for V=10,000 the bigram space is 100 million — most occurring just once in the corpus, which causes extreme sparsity.',
+    'Stopwords can actually be removed before building n-grams to reduce sparsity — they are not required.'
+  ]},
+  7: { text: [
+    'Dimensionality is actually the opposite — contextual embeddings (BERT: 768d) are often larger than static ones (Word2Vec: 100-300d).',
+    'Both types work on any length text — length constraints are a practical memory concern, not a fundamental property.',
+    '✅ Correct! Word2Vec / GloVe assign one fixed vector per word — "bank" always maps to the same point in space regardless of context. BERT and GPT produce different vectors for the same word based on its surrounding sentence, allowing "bank" to have different representations in financial vs. geographic contexts.',
+    'Contextual models like BERT train on massive corpora and consistently outperform static embeddings on most benchmarks.'
+  ]}
+};
+
+const answered = {}; let correctCount = 0;
+function pick(qnum, optIdx, correctIdx, btn) {
+  if (answered[qnum] !== undefined) return;
+  answered[qnum] = optIdx;
+  const isCorrect = optIdx === correctIdx;
+  if (isCorrect) correctCount++;
+  const opts = document.querySelectorAll('#q'+qnum+'opts .opt');
+  opts.forEach((b,i) => { b.disabled = true; if (i===correctIdx && !isCorrect) b.classList.add('show-correct'); });
+  opts[optIdx].classList.add(isCorrect ? 'correct' : 'wrong');
+  const fb = document.getElementById('q'+qnum+'fb');
+  fb.className = 'qfeedback ' + (isCorrect ? 'ok' : 'no');
+  fb.innerHTML = EXP[qnum].text[optIdx];
+  const done = Object.keys(answered).length;
+  document.getElementById('scoreNum').textContent = correctCount + ' / 7';
+  if (done < 7) {
+    document.getElementById('scoreTitle').textContent = correctCount + ' correct so far';
+    document.getElementById('scoreMsg').textContent   = (7-done) + ' question' + (7-done>1?'s':'') + ' remaining.';
+  } else {
+    const pct = Math.round(correctCount/7*100);
+    document.getElementById('scoreTitle').textContent = pct>=85 ? 'Excellent! You understand Feature Extraction 🎉' : pct>=57 ? 'Good effort — review the red answers above.' : 'Keep studying — it takes practice!';
+    document.getElementById('scoreMsg').textContent   = 'Final score: ' + correctCount + '/7 (' + pct + '%)';
+  }
+}
+</script>
+</body>
+</html>
